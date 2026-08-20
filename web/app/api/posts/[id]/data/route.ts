@@ -8,6 +8,20 @@ import { isRateLimited } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
+// Allow the public page origin (postshare) to PATCH data cross-origin using an
+// x-api-key header (no cookies/credentials, so reflecting Origin is safe).
+function withCors(req: NextRequest, res: NextResponse) {
+  const origin = req.headers.get("origin")
+  res.headers.set("Access-Control-Allow-Origin", origin || "*")
+  res.headers.set("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS")
+  res.headers.set("Access-Control-Allow-Headers", "x-api-key, content-type")
+  return res
+}
+
+export const OPTIONS = withError(async (request: NextRequest) => {
+  return withCors(request, new NextResponse(null, { status: 204 }))
+})
+
 
 // GET /api/posts/:id/data — public unless post.isPrivate, then owner-only
 export const GET = withError(async (
@@ -32,7 +46,7 @@ export const GET = withError(async (
     if (row.userId !== userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   }
 
-  return NextResponse.json(row.data ?? {})
+  return withCors(request, NextResponse.json(row.data ?? {}))
 })
 
 // PATCH /api/posts/:id/data — auth via x-api-key. Merges into existing jsonb by
@@ -71,5 +85,5 @@ export const PATCH = withError(async (
     .where(eq(posts.id, id))
     .returning({ data: posts.data })
 
-  return NextResponse.json(updated[0].data)
+  return withCors(request, NextResponse.json(updated[0].data))
 })
