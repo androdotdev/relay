@@ -18,7 +18,7 @@ RELAY_API_KEY=post_xxx relay setup
 
 Get your API key from: [posthtml.vercel.app/dashboard](https://posthtml.vercel.app/dashboard)
 
-Configuration saved to `$XDG_CONFIG_HOME/.relay/config.json` (default `~/.config/.relay/config.json`, legacy `~/.post/config.json` auto-migrated on first read). When an OS keyring is available, the API key is stored there instead (the file keeps only non-secret options); keyring-less machines fall back to the plaintext file at `0600`.
+Configuration saved to `$XDG_CONFIG_HOME/.relay/config.json` (default `~/.config/.relay/config.json`, legacy `~/.post/config.json` auto-migrated on first read), written at `0600`. The API key is stored in plaintext in this file — there is no OS keyring dependency, so the CLI behaves identically on headless/CI/WSL and inside tmux sessions.
 
 ## Commands
 
@@ -112,7 +112,7 @@ relay data set abc123 --file meta.json
 
 ### `relay setup`
 
-Save your API key to the OS keyring (or the config file on keyring-less machines).
+Save your API key to the config file at `$XDG_CONFIG_HOME/.relay/config.json` (written at `0600`).
 
 ```bash
 relay setup
@@ -124,9 +124,9 @@ relay setup --key post_xxx    # pass directly (avoid on shared systems)
 | Variable | Default | Description |
 |---|---|---|
 | `POST_URL` | `https://posthtml.vercel.app` | Server base URL (used when the config file has no `url`) |
-| `RELAY_API_KEY` | — | API key (used when no key is stored in the keyring or config file) |
+| `RELAY_API_KEY` | — | API key (used when no key is stored in the config file) |
 | `POSTHTML_API_KEY` | — | Legacy alias for `RELAY_API_KEY` (deprecated, still honored) |
 
-API key priority: OS keyring > config file > `RELAY_API_KEY` > `POSTHTML_API_KEY` > error. A config file that exists but has no `api_key` (e.g. url-only) does not shadow the env vars.
+API key priority: config file > `RELAY_API_KEY` > `POSTHTML_API_KEY` > error. A config file that exists but has no `api_key` (e.g. url-only) does not shadow the env vars.
 
 `relay setup` itself resolves `--key` > `RELAY_API_KEY` > `POSTHTML_API_KEY` > interactive prompt.

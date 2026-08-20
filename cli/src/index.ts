@@ -212,7 +212,7 @@ program
 
 program
   .command("setup")
-  .description("Save API key (OS keyring, or config file when unavailable)")
+  .description("Save API key to the config file")
   .option("-k, --key <key>", "API key (prompts if omitted)")
   .action(async (opts: { key?: string }) => {
     let key = opts.key ?? process.env.RELAY_API_KEY ?? process.env.POSTHTML_API_KEY;
@@ -227,12 +227,8 @@ program
     if (key.length > 100) {
       console.warn(yellow("Key looks longer than expected — check you didn't paste it twice."));
     }
-    const stored = await saveConfig({ api_key: key });
-    console.log(
-      stored === "keyring"
-        ? `${green("✓")} ${dim("saved to the OS keyring")}`
-        : `${green("✓")} ${dim(`saved to ${configFilePath()}`)}`,
-    );
+    await saveConfig({ api_key: key });
+    console.log(`${green("✓")} ${dim(`saved to ${configFilePath()}`)}`);
   });
 
 // ── data ────────────────────────────────────────────────────────────────────

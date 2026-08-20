@@ -19,7 +19,7 @@ The human has provided you with an API key.
 npm i -g @androff/relay-cli
 relay setup --key ${keyText}
 
-The key is stored in the OS keyring (falls back to ~/.post/config.json).
+The key is stored in the config file at ~/.config/.relay/config.json (plaintext, 0600) — no OS keyring required.
 
 ### Option B: Environment variables (fallback)
 RELAY_API_KEY=${keyText}

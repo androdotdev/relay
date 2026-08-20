@@ -155,7 +155,7 @@ relay delete <page-id>
 relay update <page-id> <file.html>
 ```
 
-Configuration saved to `$XDG_CONFIG_HOME/.relay/config.json` (default `~/.config/.relay/config.json`, legacy `~/.post/config.json` auto-migrated on first read). When an OS keyring is available (Windows Credential Manager, macOS Keychain, libsecret), the API key is stored there instead and the file keeps only non-secret options; keyring-less machines fall back to the plaintext file at `0600`. Key resolution priority: OS keyring > config file > `RELAY_API_KEY` > `POSTHTML_API_KEY` (legacy alias, deprecated) > error.
+Configuration saved to `$XDG_CONFIG_HOME/.relay/config.json` (default `~/.config/.relay/config.json`, legacy `~/.post/config.json` auto-migrated on first read), written at `0600`. The API key is stored in plaintext in this file — there is no OS keyring dependency, so the CLI behaves identically on headless/CI/WSL and inside tmux sessions. Key resolution priority: config file > `RELAY_API_KEY` > `POSTHTML_API_KEY` (legacy alias, deprecated) > error.
 
 ## Template interpolation
 

@@ -1,13 +1,12 @@
 import { homedir } from "node:os";
 import { writeFileSync, readFileSync, mkdirSync, existsSync, statSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
-import { saveToKeyring, readFromKeyring, deleteFromKeyring } from "./keyring.js";
 
 // Config file lives at $XDG_CONFIG_HOME/.relay/config.json (0600), falling
-// back to ~/.config/.relay/config.json when XDG_CONFIG_HOME is unset. On
-// machines with an OS keyring, the API key is stored there instead and the
-// file keeps only the non-secret options. Paths are resolved per call so
-// tests can swap HOME / XDG_CONFIG_HOME.
+// back to ~/.config/.relay/config.json when XDG_CONFIG_HOME is unset. The API
+// key is stored here in plaintext at 0600 — there is no OS keyring dependency,
+// so the CLI behaves identically on headless/CI/WSL and inside tmux sessions.
+// Paths are resolved per call so tests can swap HOME / XDG_CONFIG_HOME.
 
 export interface PtdConfig {
   api_key?: string;
@@ -56,31 +55,21 @@ function writeFileConfig(config: PtdConfig): void {
   writeFileSync(file, JSON.stringify(config, null, 2), { mode: 0o600 });
 }
 
-/** Key resolution: OS keyring first, then the config file, then "". */
+/** Key resolution: the config file, then "". */
 export async function loadConfig(): Promise<PtdConfig> {
   const file = readFileConfig();
-  const fromKeyring = await readFromKeyring();
   return {
-    api_key: fromKeyring ?? file?.api_key,
+    api_key: file?.api_key,
     url: file?.url,
   };
 }
 
 /**
- * Persist config. The API key goes to the OS keyring when available (keeping
- * the plaintext off disk); otherwise the whole config is written to the file
- * with 0600 permissions. A stale keyring entry is cleared when falling back
- * so an old key can't shadow the newly saved one.
- * Returns where the key ended up so callers can report it accurately.
+ * Persist config to the config file (0600). The API key is written in
+ * plaintext — there is no OS keyring, so behavior is identical everywhere.
  */
-export async function saveConfig(config: PtdConfig): Promise<"keyring" | "file"> {
-  if (config.api_key && (await saveToKeyring(config.api_key))) {
-    writeFileConfig({ url: config.url });
-    return "keyring";
-  }
-  await deleteFromKeyring();
+export async function saveConfig(config: PtdConfig): Promise<void> {
   writeFileConfig(config);
-  return "file";
 }
 
 /** Config file permission check — 0600 as written, loosened only by umask. */
