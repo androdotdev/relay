@@ -82,7 +82,7 @@ export const PATCH = withError(async (
   if (body.html !== undefined) {
     if (typeof body.html !== "string") return NextResponse.json({ error: "html must be a string" }, { status: 400 })
     if (body.html.length > MAX_HTML_SIZE) {
-      return NextResponse.json({ error: `HTML content exceeds 512KB limit` }, { status: 413 })
+      return NextResponse.json({ error: `HTML content exceeds ${MAX_HTML_SIZE / (1024 * 1024)}MB limit` }, { status: 413 })
     }
     // Convert when html is (re)submitted; `type` labels the source format of
     // the html in this request, so a type-only PATCH just relabels the post.

@@ -6,4 +6,4 @@
 export const BASE_URL = (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "")
 
 // Hard cap on uploaded HTML size (matches the PATCH validation limit).
-export const MAX_HTML_SIZE = 524_288 // 512KB
+export const MAX_HTML_SIZE = 2_097_152 // 2MB

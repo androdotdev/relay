@@ -159,7 +159,7 @@ async function handleToolCall(name: string, args: Record<string, unknown> | unde
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: `type must be one of: ${POST_TYPES.join(", ")}` }) }], isError: true }
       }
       if (args.html.length > MAX_HTML_SIZE) {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "HTML content exceeds 512KB limit" }) }], isError: true }
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: `HTML content exceeds ${MAX_HTML_SIZE / (1024 * 1024)}MB limit` }) }], isError: true }
       }
 
       const id = nanoid(16)
@@ -188,7 +188,7 @@ async function handleToolCall(name: string, args: Record<string, unknown> | unde
         return { content: [{ type: "text" as const, text: JSON.stringify({ error: `type must be one of: ${POST_TYPES.join(", ")}` }) }], isError: true }
       }
       if (args.html.length > MAX_HTML_SIZE) {
-        return { content: [{ type: "text" as const, text: JSON.stringify({ error: "HTML content exceeds 512KB limit" }) }], isError: true }
+        return { content: [{ type: "text" as const, text: JSON.stringify({ error: `HTML content exceeds ${MAX_HTML_SIZE / (1024 * 1024)}MB limit` }) }], isError: true }
       }
 
       const existing = (await db

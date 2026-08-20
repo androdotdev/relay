@@ -23,7 +23,7 @@ export const POST = withError(async (request: NextRequest) => {
     return NextResponse.json({ error: `type must be one of: ${POST_TYPES.join(", ")}` }, { status: 400 })
   }
   if (html.length > MAX_HTML_SIZE) {
-    return NextResponse.json({ error: `HTML content exceeds 512KB limit` }, { status: 413 })
+    return NextResponse.json({ error: `HTML content exceeds ${MAX_HTML_SIZE / (1024 * 1024)}MB limit` }, { status: 413 })
   }
   const id = nanoid(16)
   const rendered = renderPageHtml(html, type)
