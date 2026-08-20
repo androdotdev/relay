@@ -144,6 +144,7 @@ relay setup --key post_xxx    # or pass directly
 relay data get <id>           # get page json data
 relay data set <id> --key <k> --value '<json>'  # set one key in data
 relay data set <id> --file data.json  # merge whole object into data
+relay data set <id> --replace --file data.json  # overwrite data instead of merging
 
 relay publish index.html
 relay publish index.html --data '{"status":"draft"}'   # attach data in the same call

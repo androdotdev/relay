@@ -102,6 +102,10 @@ relay data set abc123 --key status --value '"draft"'
 
 # Merge entire JSON file
 relay data set abc123 --file meta.json
+
+# Overwrite the whole data object (replaces existing data instead of merging)
+relay data set abc123 --replace --key status --value '"draft"'
+relay data set abc123 --replace --file meta.json
 ```
 
 | Option | Description |
@@ -109,6 +113,7 @@ relay data set abc123 --file meta.json
 | `-k, --key <key>` | JSON key to set |
 | `-v, --value <value>` | JSON value (required with `--key`) |
 | `-f, --file <path>` | JSON file to merge (whole object) |
+| `-r, --replace` | Overwrite post data instead of merging |
 
 ### `relay setup`
 

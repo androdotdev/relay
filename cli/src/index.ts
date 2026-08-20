@@ -247,11 +247,12 @@ dataCmd
 
 dataCmd
   .command("set <id>")
-  .description("Merge data into a post")
+  .description("Merge or overwrite data on a post")
   .option("-k, --key <key>", "JSON key to set")
   .option("-v, --value <value>", 'JSON value (required with --key, e.g. \'[{"repo":"cardfoi"}]\')')
   .option("-f, --file <path>", "JSON file to merge (whole object)")
-  .action(async (id: string, options: { key?: string; value?: string; file?: string }) => {
+  .option("-r, --replace", "Overwrite post data instead of merging")
+  .action(async (id: string, options: { key?: string; value?: string; file?: string; replace?: boolean }) => {
     let body: Record<string, unknown>;
 
     if (options.file) {
@@ -282,8 +283,10 @@ dataCmd
       process.exit(1);
     }
 
-    process.stdout.write(`${dim("→ Merging data into post...")}\n`);
-    const result = await api(`/api/posts/${id}/data`, {
+    const verb = options.replace ? "Overwriting" : "Merging";
+    process.stdout.write(`${dim(`→ ${verb} data into post...`)}\n`);
+    const dataUrl = options.replace ? `/api/posts/${id}/data?replace=1` : `/api/posts/${id}/data`;
+    const result = await api(dataUrl, {
       method: "PATCH",
       body: JSON.stringify(body),
     });

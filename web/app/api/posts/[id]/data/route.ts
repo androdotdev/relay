@@ -35,7 +35,8 @@ export const GET = withError(async (
   return NextResponse.json(row.data ?? {})
 })
 
-// PATCH /api/posts/:id/data — auth via x-api-key, merges into existing jsonb
+// PATCH /api/posts/:id/data — auth via x-api-key. Merges into existing jsonb by
+// default; pass `?replace=1` to overwrite the whole jsonb instead.
 export const PATCH = withError(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -44,6 +45,8 @@ export const PATCH = withError(async (
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   const { id } = await params
+  // `?replace=1` overwrites data wholesale; otherwise the body is merged in.
+  const replace = request.nextUrl.searchParams.get("replace") === "1"
 
   // Verify ownership
   const post = await db
@@ -60,15 +63,13 @@ export const PATCH = withError(async (
     return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 })
   }
 
-  // Merge into existing jsonb using Postgres ||
-  // safe: `fragment` is bound as a Drizzle parameter ($1), not string-concatenated —
-  // sql`` here is just Postgres's jsonb `||` merge operator, which Drizzle doesn't wrap natively
   const fragment = JSON.stringify(body)
-  const merged = await db
+  // `?replace=1` overwrites the whole jsonb; otherwise merge into existing data.
+  const updated = await db
     .update(posts)
-    .set({ data: sql`${posts.data} || ${fragment}::jsonb` })
+    .set({ data: replace ? sql`${fragment}::jsonb` : sql`${posts.data} || ${fragment}::jsonb` })
     .where(eq(posts.id, id))
     .returning({ data: posts.data })
 
-  return NextResponse.json(merged[0].data)
+  return NextResponse.json(updated[0].data)
 })
