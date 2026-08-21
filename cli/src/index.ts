@@ -292,6 +292,47 @@ dataCmd
     });
     console.log(JSON.stringify(result, null, 2));
   });
+// ── token (scoped capability mint) ─────────────────────────────────────────────
+program
+  .command("token <id>")
+  .description("Mint a scoped capability token for a post (for client-side plugins)")
+  .option("-s, --scope <scope>", "Capability scope: data:patch | data:read | post:read", "data:patch")
+  .option("--subkeys <keys>", "Comma-separated data subkeys the token may write (data:patch only)")
+  .option("-p, --plugin <id>", "Plugin id to scope the token to")
+  .option("-e, --expires <ms>", "Token lifetime in milliseconds (default 30 days)")
+  .action(async (id: string, options: { scope?: string; subkeys?: string; plugin?: string; expires?: string }) => {
+    if (!API_KEY) {
+      console.error(red("No API key configured. Run `relay setup`."))
+      process.exit(1)
+    }
+    const scope = options.scope ?? "data:patch"
+    if (!["data:patch", "data:read", "post:read"].includes(scope)) {
+      console.error(red(`Invalid scope: ${scope}`))
+      process.exit(1)
+    }
+    const subkeys = options.subkeys
+      ? options.subkeys.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined
+    const body: Record<string, unknown> = { scope }
+    if (subkeys) body.subkeys = subkeys
+    if (options.plugin) body.pluginId = options.plugin
+    if (options.expires) body.expiresInMs = Number(options.expires)
+
+    const res = await fetch(`${BASE_URL}/api/posts/${id}/token`, {
+      method: "POST",
+      headers: { "x-api-key": API_KEY, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    })
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}))
+      console.error(red(`Failed: ${err.error ?? res.statusText}`))
+      process.exit(1)
+    }
+    const json = await res.json()
+    console.log(green("Scoped token minted:"))
+    console.log(json.token)
+    if (json.subkeys) console.log(dim(`subkeys: ${(json.subkeys as string[]).join(", ")}`))
+  })
 
 // Require API key for all commands except `setup`
 program.hook("preAction", (thisCommand, actionCommand) => {

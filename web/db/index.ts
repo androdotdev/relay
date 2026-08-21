@@ -21,7 +21,17 @@ function buildDb(): NeonDatabase {
   if (useWebSocket) {
     // useWebSocket implies a global WebSocket exists (Node 22+, Bun, Vercel
     // Node 22) — the driver picks it up via neonConfig.webSocketConstructor.
-    const pool = new Pool({ connectionString: getUrl() })
+  // Bound the pool: plugin-driven client writes (drag-position saves, etc.)
+  // can open many concurrent connections; an unbounded pool hits Neon's
+  // connection ceiling. allowExitOnIdle releases idle slots so warm instances
+  // don't hold connections forever (serverless has no process exit to call .end()).
+  const pool = new Pool({
+    connectionString: getUrl(),
+    max: Number(process.env.DB_POOL_MAX ?? 5),
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
+    allowExitOnIdle: true,
+  })
     return drizzleWs({ client: pool, relations: schemaRelations })
   }
   // Both drivers expose the same query-builder surface; the HTTP result is

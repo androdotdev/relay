@@ -5,6 +5,7 @@ import { eq, sql } from "drizzle-orm"
 import { withError } from "@/lib/with-error"
 import { getAuthenticatedUserId } from "@/lib/auth-user"
 import { isRateLimited } from "@/lib/rate-limit"
+import { verifyCapability } from "@/lib/post-token"
 
 export const runtime = "nodejs"
 export const dynamic = "force-dynamic"
@@ -14,7 +15,7 @@ function withCors(req: NextRequest, res: NextResponse) {
   const origin = req.headers.get("origin")
   res.headers.set("Access-Control-Allow-Origin", origin || "*")
   res.headers.set("Access-Control-Allow-Methods", "GET, PATCH, OPTIONS")
-  res.headers.set("Access-Control-Allow-Headers", "x-api-key, content-type")
+  res.headers.set("Access-Control-Allow-Headers", "x-api-key, x-capability-token, content-type")
   return res
 }
 
@@ -55,12 +56,37 @@ export const PATCH = withError(async (
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) => {
-  const userId = await getAuthenticatedUserId(request)
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
-
   const { id } = await params
   // `?replace=1` overwrites data wholesale; otherwise the body is merged in.
   const replace = request.nextUrl.searchParams.get("replace") === "1"
+
+  // Scoped capability-token path (client-side plugins). Carries post + scope +
+  // optional subkey limits — never full account auth. Safe to embed in a public
+  // page because it cannot delete the post or touch other posts.
+  const capToken = request.headers.get("x-capability-token")
+  if (capToken) {
+    const cap = verifyCapability(capToken, { postId: id, scope: "data:patch" })
+    if (!cap) return NextResponse.json({ error: "Invalid capability token" }, { status: 401 })
+    if (replace) return NextResponse.json({ error: "Capability tokens cannot replace data" }, { status: 403 })
+    const body = await request.json()
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Body must be a JSON object" }, { status: 400 })
+    }
+    if (cap.subkeys && !Object.keys(body).every((k) => cap.subkeys!.includes(k))) {
+      return NextResponse.json({ error: "Body violates token scope" }, { status: 403 })
+    }
+    const fragment = JSON.stringify(body)
+    const updated = await db
+      .update(posts)
+      .set({ data: sql`${posts.data} || ${fragment}::jsonb` })
+      .where(eq(posts.id, id))
+      .returning({ data: posts.data })
+    return withCors(request, NextResponse.json(updated[0].data))
+  }
+
+  // Full-auth path (CLI / dashboard): requires the owner's API key or session.
+  const userId = await getAuthenticatedUserId(request)
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
 
   // Verify ownership
   const post = await db

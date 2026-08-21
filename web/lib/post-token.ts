@@ -2,6 +2,9 @@ import { createHmac, timingSafeEqual } from "node:crypto"
 
 const TOKEN_EXPIRY_MS = 1_000 * 60 * 60 * 24 * 30 // 30 days
 
+/** Operations a capability token may grant. Never includes destructive scopes. */
+export type CapabilityScope = "post:read" | "data:read" | "data:patch"
+
 export interface TokenPayload {
   postId: string
   userId: string
@@ -9,6 +12,12 @@ export interface TokenPayload {
   v: number
   iat: number
   exp: number
+  /** capability scope granted by this token (absent = legacy private-viewer token) */
+  scope?: CapabilityScope
+  /** for data:patch — only these top-level data keys may be written */
+  subkeys?: string[]
+  /** plugin the token is scoped to (prevents cross-plugin reuse) */
+  pluginId?: string
 }
 
 function getSecret(): string {
@@ -74,4 +83,55 @@ export function verifyToken(token: string): TokenPayload | null {
   } catch {
     return null
   }
+}
+
+export interface SignCapabilityOptions {
+  postId: string
+  scope: CapabilityScope
+  subkeys?: string[]
+  pluginId?: string
+  version?: number
+  userId?: string
+  expiresInMs?: number
+}
+
+/** Sign a scoped capability token (post-scoped, optionally subkey/plugin-limited). */
+export function signCapability(opts: SignCapabilityOptions): string {
+  const secret = getSecret()
+  const now = Date.now()
+  const payload: TokenPayload = {
+    postId: opts.postId,
+    userId: opts.userId ?? "",
+    v: opts.version ?? 1,
+    iat: now,
+    exp: now + (opts.expiresInMs ?? TOKEN_EXPIRY_MS),
+    scope: opts.scope,
+    subkeys: opts.subkeys,
+    pluginId: opts.pluginId,
+  }
+  const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url")
+  const sig = createHmac("sha256", secret).update(encoded).digest("base64url")
+  return `${encoded}.${sig}`
+}
+
+export interface VerifyCapabilityOptions {
+  postId: string
+  scope: CapabilityScope
+  pluginId?: string
+}
+
+/**
+ * Verify a capability token and assert it grants the requested scope for the
+ * post. Returns the payload (incl. allowed subkeys) or null.
+ */
+export function verifyCapability(
+  token: string,
+  check: VerifyCapabilityOptions,
+): TokenPayload | null {
+  const payload = verifyToken(token)
+  if (!payload) return null
+  if (payload.postId !== check.postId) return null
+  if (payload.scope !== check.scope) return null
+  if (check.pluginId && payload.pluginId !== check.pluginId) return null
+  return payload
 }

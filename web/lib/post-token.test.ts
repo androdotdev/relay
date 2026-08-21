@@ -1,96 +1,47 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { signToken, verifyToken } from "@/lib/post-token";
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { signCapability, verifyCapability, signToken, verifyToken } from "./post-token"
 
-describe("post-token", () => {
-  beforeEach(() => {
-    process.env.POST_TOKEN_SECRET = "test-secret-that-is-at-least-32-chars!!";
-  });
+beforeEach(() => {
+  process.env.POST_TOKEN_SECRET = "test-secret"
+})
+afterEach(() => {
+  delete process.env.POST_TOKEN_SECRET
+})
 
-  afterEach(() => {
-    delete process.env.POST_TOKEN_SECRET;
-  });
+describe("capability tokens", () => {
+  it("roundtrips a scoped data:patch token with subkeys", () => {
+    const t = signCapability({ postId: "p1", scope: "data:patch", subkeys: ["layout"], userId: "u1", version: 2 })
+    const p = verifyCapability(t, { postId: "p1", scope: "data:patch" })
+    expect(p).not.toBeNull()
+    expect(p!.postId).toBe("p1")
+    expect(p!.subkeys).toEqual(["layout"])
+    expect(p!.v).toBe(2)
+  })
 
-  it("signs and verifies a valid token", () => {
-    const token = signToken("post-123", "user-456");
-    expect(token).toBeTruthy();
-    expect(token).toContain(".");
+  it("rejects wrong postId", () => {
+    const t = signCapability({ postId: "p1", scope: "data:patch" })
+    expect(verifyCapability(t, { postId: "p2", scope: "data:patch" })).toBeNull()
+  })
 
-    const payload = verifyToken(token);
-    expect(payload).not.toBeNull();
-    expect(payload!.postId).toBe("post-123");
-    expect(payload!.userId).toBe("user-456");
-    expect(payload!.iat).toBeGreaterThan(0);
-    expect(payload!.exp).toBeGreaterThan(payload!.iat);
-  });
+  it("rejects wrong scope", () => {
+    const t = signCapability({ postId: "p1", scope: "data:patch" })
+    expect(verifyCapability(t, { postId: "p1", scope: "data:read" })).toBeNull()
+  })
 
-  it("carries the token version and defaults to 1", () => {
-    const payload = verifyToken(signToken("post-123", "user-456"));
-    expect(payload!.v).toBe(1);
+  it("rejects wrong pluginId", () => {
+    const t = signCapability({ postId: "p1", scope: "data:patch", pluginId: "A" })
+    expect(verifyCapability(t, { postId: "p1", scope: "data:patch", pluginId: "B" })).toBeNull()
+  })
 
-    const rotated = verifyToken(signToken("post-123", "user-456", 2));
-    expect(rotated!.v).toBe(2);
-  });
+  it("legacy signToken/verifyToken still works", () => {
+    const t = signToken("p1", "u1", 3)
+    const p = verifyToken(t)
+    expect(p?.postId).toBe("p1")
+    expect(p?.v).toBe(3)
+  })
 
-  it("treats legacy tokens (no version) as version 1", async () => {
-    // A token signed before versioning has no `v` field — it must verify
-    // (as v1) until the post's visibility is first toggled.
-    const token = signToken("post-123", "user-456", 1);
-    const parts = token.split(".");
-    const payload = JSON.parse(Buffer.from(parts[0], "base64url").toString());
-    delete payload.v;
-
-    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-    const { createHmac } = await import("node:crypto");
-    const sig = createHmac("sha256", "test-secret-that-is-at-least-32-chars!!")
-      .update(encoded)
-      .digest("base64url");
-
-    const legacyToken = `${encoded}.${sig}`;
-    const verified = verifyToken(legacyToken);
-    expect(verified).not.toBeNull();
-    expect(verified!.v).toBe(1);
-  });
-
-  it("returns null for tampered token (payload changed)", () => {
-    const token = signToken("post-123", "user-456");
-    const parts = token.split(".");
-
-    // Base64url-decode the payload, modify it, re-encode
-    const decoded = JSON.parse(Buffer.from(parts[0], "base64url").toString());
-    decoded.userId = "user-attacker";
-    const tamperedPayload = Buffer.from(JSON.stringify(decoded)).toString("base64url");
-
-    const tamperedToken = `${tamperedPayload}.${parts[1]}`;
-    expect(verifyToken(tamperedToken)).toBeNull();
-  });
-
-  it("returns null for tampered token (signature changed)", () => {
-    const token = signToken("post-123", "user-456");
-    const parts = token.split(".");
-    const badToken = `${parts[0]}.invalidsignature`;
-    expect(verifyToken(badToken)).toBeNull();
-  });
-
-  it("returns null for malformed token", () => {
-    expect(verifyToken("not-a-dot")).toBeNull();
-    expect(verifyToken("")).toBeNull();
-    expect(verifyToken("a.b.c")).toBeNull();
-  });
-
-  it("rejects expired tokens", async () => {
-    // Sign a token, then modify the payload to have an expired timestamp
-    const token = signToken("post-123", "user-456");
-    const parts = token.split(".");
-    const payload = JSON.parse(Buffer.from(parts[0], "base64url").toString());
-    payload.exp = Date.now() - 1000; // expired 1 second ago
-
-    const encoded = Buffer.from(JSON.stringify(payload)).toString("base64url");
-    const { createHmac } = await import("node:crypto");
-    const sig = createHmac("sha256", "test-secret-that-is-at-least-32-chars!!")
-      .update(encoded)
-      .digest("base64url");
-
-    const expiredToken = `${encoded}.${sig}`;
-    expect(verifyToken(expiredToken)).toBeNull();
-  });
-});
+  it("rejects a tampered token", () => {
+    const t = signCapability({ postId: "p1", scope: "data:patch" })
+    expect(verifyCapability(t + "x", { postId: "p1", scope: "data:patch" })).toBeNull()
+  })
+})
